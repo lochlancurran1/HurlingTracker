@@ -30,22 +30,19 @@ public record TrainingSession(int id, LocalDate date,
             return date + " | " + type + " | " + minutes + " min | int " + intensity + n + " | ID " + id;
         }
         public String toCsv() {
-            return String.join(",",
-                Integer.toString(id),
-                CsvUtil.esc(id),
-                CsvUtil.esc(date.toString()),
-                CsvUtil.esc(type.name()),
-                Integer.toString(minutes),
-                Integer.toString(intensity),
-                CsvUtil.esc(notes)
-            );
+            return id + "," +
+                date + "," +
+                type + "," +
+                minutes + "," +
+                intensity + "," +
+                CsvUtil.clean(notes);
         }
         public static TrainingSession fromCsv(String line) {
             var cols = CsvUtil.parse(line);
             if (cols.size() < 6) throw new IllegalArgumentException("Bad session row: " + line);
             
             return new TrainingSession(
-                Integer.parseInt(cols.get(0)), LocalDate.parse(cols.get(1)),
+                Integer.parseInt(cols.get(0)), java.time.LocalDate.parse(cols.get(1)),
                 SessionType.valueOf(cols.get(2)),
                 Integer.parseInt(cols.get(3)),
                 Integer.parseInt(cols.get(4)),
