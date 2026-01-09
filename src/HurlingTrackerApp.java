@@ -1,5 +1,7 @@
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
 
 public class HurlingTrackerApp {
 
@@ -23,6 +25,7 @@ public class HurlingTrackerApp {
             System.out.print("> ");
 
             String choice = scanner.nextLine().trim();
+            
             switch (choice) {
                 case "1" -> addSession(scanner, tracker);
                 case "2" -> listSessions(tracker);
@@ -51,17 +54,18 @@ public class HurlingTrackerApp {
             System.out.print("Notes (optional): ");
             String notes = scanner.nextLine().trim();
 
-            TrainingSession session = TrainingSession.create(date, type, minutes, intensity, notes);
+            int id = tracker.nextSessionId();
+            TrainingSession session = TrainingSession.create(id, date, type, minutes, intensity, notes);
             tracker.addSession(session);
             tracker.save();
 
-            System.out.println("Added:\n" + s.pretty());
-        } catch (Exceotion e) {
+            System.out.println("Added:\n" + session.neat());
+        } catch (Exception e) {
             System.out.println("Error adding session: " + e.getMessage());
         }
         }
 
-        private static void listSessions(TrackerSerivce tracker) {
+        private static void listSessions(TrackerService tracker) {
             List<TrainingSession> sessions = tracker.getLastSessions(10);
             if (sessions.isEmpty()) {
                 System.out.println("No sessions logged yet.");
@@ -69,7 +73,7 @@ public class HurlingTrackerApp {
             }
             System.out.println("\nLast sessions:");
             for (TrainingSession s : sessions) {
-                System.out.println(s.neat());
+                System.out.println(s.neatOneLine());
             }
         }
 
@@ -82,10 +86,13 @@ public class HurlingTrackerApp {
 
                 int reps = readInt(scanner, "Reps (e.g. strikes, sprints, gym reps): ");
                 int success = readInt(scanner, "Success (0 if not tracking): ");
+                
                 System.out.print("Notes (optional): ");
                 String notes = scanner.nextLine().trim();
 
-                DrillEntry drill = DrillEntry.create(session.id(), drillType, reps, success, notes);
+                int drillId = tracker.nextDrillId();
+                DrillEntry drill = DrillEntry.create(drillId, session.id(), drillType, reps, success, notes);
+                
                 tracker.addDrill(drill);
                 tracker.save();
 
@@ -113,34 +120,36 @@ public class HurlingTrackerApp {
             }
          }
 
-         private static void weeklyStats(TrackerSerive tracker) {
+         private static void weeklyStats(TrackerService tracker) {
             LocalDate to = LocalDate.now();
             LocalDate from = to.minusDays(6);
 
             TrackerService.WeeklyStats stats = tracker.getWeeklyStats(from, to);
 
             System.out.println("\nLast 7 days (" + from + " to " + to + ")");
-            System.out.println("Total sessions: " + stats.totalSessions());
+            System.out.println("Total sessions: " + stats.sessionCount());
             System.out.println("Total minutes: " + stats.totalMinutes());
             System.out.println("Load:    " + stats.trainingLoad() + " (minutes * intensity)");
 
             System.out.println("\nMinutes by session type:");
-            for (SessionType t : SessionType.values()) {
-                System.out.printf(" - %-10s %d%n", t, stats.minutesByType().getOrDefault(t, 0));
+            SessionType[] sessionTypes = SessionType.values();
+            for (int i = 0; i < sessionTypes.length; i++) {
+                System.out.println(" - " + sessionTypes[i] + ": " + stats.minutesByType()[i]);
             }
 
             System.out.println("\nDrill reps totals:");
-            for (DrillType d : DrillType.values()) {
-                int reps = stats.repsByDrill().getOrDefault(d, 0);
-                if (reps > 0) System.out.printf(" - %-14s %d%n", d, reps);
+            DrillType[] drillTypes = DrillType.values();
+            for (int i = 0; i < drillTypes.length; i++) {
+                int reps = stats.repsByDrill()[i];
+                if (reps > 0) System.out.println(" - " + drillTypes[i] + ": " + reps);
             }
-
+        
             System.out.println("\nDrill success totals:");
-            for (DrillType d : DrillType.values()) {
-                int success = stats.successByDrill().getOrDefault(d, 0);
-                if (success > 0) System.out.printf(" - %-14s %d%n", d, success);
-            }
+            for (int i = 0; i < drillTypes.length; i++) {
+                int success = stats.successByDrill()[i];
+                if (success > 0) System.out.println(" - " + drillTypes[i] + ": " + success);
          }
+        }
 
          private static LocalDate readDate(Scanner scanner) {
             System.out.print("Date (YYYY-MM-DD) or blank for today: ");

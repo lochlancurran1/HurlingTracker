@@ -7,8 +7,12 @@ import java.util.Set;
 
 public class TrackerService {
     private final CsvStorage storage;
-    private final List<TrainingSession> sessions = new ArrayList<>():
-    private final List<DrillEntry> drills = new ArrayList<>():
+    
+    private final List<TrainingSession> sessions = new ArrayList<>();
+    private final List<DrillEntry> drills = new ArrayList<>();
+
+    private int nextSessionId = 1;
+    private int nextDrillId = 1;
 
     public TrackerService(CsvStorage storage) {
         this.storage = storage;
@@ -20,11 +24,31 @@ public class TrackerService {
         sessions.addAll(storage.loadSessions());
         drills.addAll(storage.loadDrills());
         sortSessionsNewestFirst();
+
+        int maxSession = 0;
+        for (TrainingSession s : sessions) {
+            if (s.id() > maxSession) maxSession = s.id();
+        }
+        nextSessionId = maxSession + 1;
+
+        int maxDrill = 0;
+        for (DrillEntry d : drills) {
+            if (d.id() > maxDrill) maxDrill = d.id();
+        }
+        nextDrillId = maxDrill + 1;
     }
 
     public void save() {
         storage.saveSessions(sessions);
         storage.saveDrills(drills);
+    }
+
+    public int nextSessionId() {
+        return nextSessionId++;
+    }
+
+    public int nextDrillId() {
+        return nextDrillId++;
     }
 
     public void addSession(TrainingSession session) {
@@ -37,10 +61,14 @@ public class TrackerService {
     }
 
     public List<TrainingSession> getLastSessions(int n) {
-        return sessions.stream().limit(n).toList();
+        List<TrainingSession> out = new ArrayList<>();
+        for (int i = 0; i < sessions.size() && i < n; i++) {
+            out.add(sessions.get(i));
+        }
+        return out;
     }
 
-    public List<DrillEntry> getDrillsForSession(String sessionId) {
+    public List<DrillEntry> getDrillsForSession(int sessionId) {
         List<DrillEntry> out = new ArrayList<>();
         for (DrillEntry d : drills) {
             if (d.sessionId() == sessionId) {
@@ -61,18 +89,21 @@ public class TrackerService {
 
         int totalMinutes = 0;
         int load = 0;
+        int[] minutesByType = new int[SessionType.values().length];
+
         for (TrainingSession s : weekSessions) {
             totalMinutes += s.minutes();
             load += s.minutes() * s.intensity();
+            minutesByType[s.type().ordinal()] += s.minutes();
         }
 
-        int[] minutesByType = new int[SessionType.values().length];
+        
         
         for  (TrainingSession s : weekSessions) {
             totalMinutes += s.minutes();
             load += s.minutes() * s.intensity();
 
-            int typeIndex = s.type().oridinal();
+            int typeIndex = s.type().ordinal();
             minutesByType[typeIndex] += s.minutes();
         }
 
@@ -85,7 +116,7 @@ public class TrackerService {
         int[] successByDrill = new int[DrillType.values().length];
 
         for (DrillEntry d : drills) {
-            if (!weekSessionsIds.contains(d.sessionId())) continue;
+            if (!weekSessionIds.contains(d.sessionId())) continue;
 
             int drillIndex = d.drillType().ordinal();
             repsByDrill[drillIndex] += d.reps();
