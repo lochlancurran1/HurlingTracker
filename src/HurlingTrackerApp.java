@@ -8,9 +8,11 @@ public class HurlingTrackerApp {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        CsvStorage storage = new CsvStorage("sessions.csv", "drills.csv");
+        CsvStorage storage = new CsvStorage("sessions.csv", "drills.csv", "targets.csv");
         TrackerService tracker = new TrackerService(storage);
         tracker.load();
+
+        tracker.save(); // Ensure targets file exists
 
         System.out.println("Hurling Training Tracker (Java CLI)");
 
@@ -20,8 +22,12 @@ public class HurlingTrackerApp {
             System.out.println("2. List sessions (last 10)");
             System.out.println("3. Add drill to a session");
             System.out.println("4. View drills for a session");
-            System.out.println("5.Weekly stats (Last 7 days)");
-            System.out.println("6. Exit");
+            System.out.println("5. Weekly stats (Last 7 days)");
+            System.out.println("6. Set Targets");
+            System.out.println("7. Delete session");
+            System.out.println("8. Delete session");
+            System.out.println("9. Print weekly report");
+            System.out.println("10. Exit");
             System.out.print("> ");
 
             String choice = scanner.nextLine().trim();
@@ -32,7 +38,11 @@ public class HurlingTrackerApp {
                 case "3" -> addDrill(scanner, tracker);
                 case "4" -> viewDrills(scanner, tracker);
                 case "5" -> weeklyStats(tracker);
-                case "6" -> {
+                case "6" -> setTargets(scanner, tracker);
+                case "7" -> deleteSession(scanner, tracker);
+                case "8" -> editSession(scanner, tracker);
+                case "9" -> printWeeklyReport(tracker);
+                case "10" -> {
                     tracker.save();
                     System.out.println("Saved. Exiting.");
                     return;
@@ -151,6 +161,127 @@ public class HurlingTrackerApp {
          }
         }
 
+        public static void setTargets(Scanner scanner, TrackerService tracker) {
+            Targets cur = tracker.getTargets();
+
+            System.out.println("\nCurrent targets:");
+            System.out.println("1. Sessions per week: " + cur.sessionsPerWeek());
+            System.out.println("2. Wall ball reps/week: " + cur.wallBallRepsPerWeek());
+            System.out.println("3. Gym minutes/week: " + cur.gymMinutesPerWeek());
+            System.out.println("\nEnter new values or leave blank to keep current.");
+
+            Integer sessions = readOptionalInt(scanner, "Sessions per week: ");
+            Integer wallBall = readOptionalInt(scanner, "Wall ball reps/week: ");
+            Integer gym = readOptionalInt(scanner, "Gym minutes/week: ");
+
+            Targets updated = new Targets(
+                sessions == null ? cur.sessionsPerWeek() : sessions,
+                wallBall == null ? cur.wallBallRepsPerWeek() : wallBall,
+                gym == null ? cur.gymMinutesPerWeek() : gym
+            );
+
+            tracker.setTargets(updated);
+            tracker.save();
+            System.out.println("Targets saved.");
+        }
+
+        private static void deleteSession(Scanner scanner, TrackerService tracker) {
+            TrainingSession session = pickSession(scanner, tracker);
+            if (session == null) return;
+
+            System.out.print("Delete session ID " + session.id() + " (and its drills)? (y/n): ");
+            String confirm = scanner.nextLine().trim().toLowerCase();
+            if (!confirm.equals("y")){
+                System.out.println("Cancelled.");
+                return;
+            }
+
+            boolean ok = tracker.deleteSession(session.id());
+            if (ok) {
+                tracker.save();
+                System.out.println("Deleted.");
+            } else {
+                System.out.println("Could not delete (not found).");
+            }
+  }
+
+        private static void editSession(Scanner scanner, TrackerService tracker) {
+            TrainingSession session = pickSession(scanner, tracker);
+            if (session == null) return;
+
+            System.out.println("Editing session:\n");
+            System.out.println(session.neatOneLine());
+            System.out.println("Leave blank to keep existing.\n");
+
+            LocalDate newDate = readOptionalDate(scanner, "Date (YYYY-MM-DD): ");
+            SessionType newType = readOptionalSessionType(scanner, "New type: ");
+            Integer newMinutes = readOptionalInt(scanner, "New minutes: ");
+            Integer newIntensity = readOptionalInt(scanner, "New intensity (1-5): ");
+            String newNotes = readOptionalString(scanner, "New notes: ");
+
+            TrainingSession updated = new TrainingSession(
+                session.id(),
+                newDate == null ? session.date() : newDate,
+                newType == null ? session.type() : newType,
+                newMinutes == null ? session.minutes() : newMinutes,
+                newIntensity == null ? session.intensity() : newIntensity,
+                newNotes == null ? session.notes() : newNotes
+            );
+
+            boolean ok = tracker.updateSession(updated);
+            if (ok) {
+                tracker.save();
+                System.out.println("Updated:\n" + updated.neat());
+            } else {
+                System.out.println("Could not update (not found).");
+            }
+        }
+
+        private static void printWeeklyReport(TrackerService tracker) {
+            LocalDate to = LocalDate.now();
+            LocalDate from = to.minusDays(6);
+
+            TrackerService.WeeklyStats stats = tracker.getWeeklyStats(from, to);
+            Targets targets = tracker.getTargets();
+
+            int gymMinutes = stats.minutesByType()[SessionType.GYM.ordinal()];
+            int wallBallReps = stats.repsByDrill()[DrillType.WALL_BALL.ordinal()];
+
+            System.out.println("\n==============================");
+        System.out.println("WEEK REPORT (" + from + " to " + to + ")");
+        System.out.println("==============================");
+        System.out.println("Sessions: " + stats.sessionCount() + " / " + targets.sessionsPerWeek());
+        System.out.println("Minutes:  " + stats.totalMinutes());
+        System.out.println("Load:     " + stats.trainingLoad());
+        System.out.println();
+        System.out.println("Targets progress:");
+        System.out.println("- Gym minutes: " + gymMinutes + " / " + targets.gymMinutesPerWeek());
+        System.out.println("- Wall ball reps: " + wallBallReps + " / " + targets.wallBallRepsPerWeek());
+        System.out.println();
+
+        System.out.println("By session type (minutes):");
+        SessionType[] sessionTypes = SessionType.values();
+        for (int i = 0; i < sessionTypes.length; i++) {
+            System.out.println(" - " + sessionTypes[i] + ": " + stats.minutesByType()[i]);
+        }
+        System.out.println();
+        
+
+        System.out.println("Drills (reps):");
+        DrillType[] drillTypes = DrillType.values();
+        boolean any = false;
+        for (int i = 0; i < drillTypes.length; i++) {
+            int reps = stats.repsByDrill()[i];
+            if (reps > 0) {
+                any = true;
+                System.out.println("- " + drillTypes[i] + ": " + reps);
+            }
+        }
+        if (!any) System.out.println("- (none)");
+        System.out.println("==============================\n");
+    }
+         
+
          private static LocalDate readDate(Scanner scanner) {
             System.out.print("Date (YYYY-MM-DD) or blank for today: ");
             String s = scanner.nextLine().trim();
@@ -173,6 +304,37 @@ public class HurlingTrackerApp {
             System.out.print(prompt);
             return Integer.parseInt(scanner.nextLine().trim());
          }
+
+         private static Integer readOptionalInt(Scanner scanner, String prompt) {
+            System.out.print(prompt);
+            String s = scanner.nextLine().trim();
+            if (s.isEmpty()) return null;
+            return Integer.parseInt(s);
+         }
+
+         private static String readOptionalString(Scanner scanner, String prompt) {
+            System.out.print(prompt);
+            String s = scanner.nextLine();
+            if (s == null) return null;
+            s = s.trim();
+            return s.isEmpty() ? null : s;
+         }
+
+         private static LocalDate readOptionalDate(Scanner scanner, String prompt) {
+            System.out.print(prompt);
+            String s = scanner.nextLine().trim();
+            if (s.isEmpty()) return null;
+            return LocalDate.parse(s);
+         }
+
+         private static SessionType readOptionalSessionType(Scanner scanner, String prompt) {
+            System.out.println("Session types: " + Arrays.toString(SessionType.values()));
+            System.out.print(prompt);
+            String s = scanner.nextLine().trim();
+            if (s.isEmpty()) return null;
+            return SessionType.valueOf(s.toUpperCase());
+         }
+
 
          private static TrainingSession pickSession(Scanner scanner, TrackerService tracker) {
             List<TrainingSession> sessions = tracker.getLastSessions(10);

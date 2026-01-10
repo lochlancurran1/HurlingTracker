@@ -13,6 +13,7 @@ public class TrackerService {
 
     private int nextSessionId = 1;
     private int nextDrillId = 1;
+    private Targets targets = Targets.defaultTargets();
 
     public TrackerService(CsvStorage storage) {
         this.storage = storage;
@@ -23,8 +24,18 @@ public class TrackerService {
         drills.clear();
         sessions.addAll(storage.loadSessions());
         drills.addAll(storage.loadDrills());
+        targets = storage.loadTargets().orElse(Targets.defaultTargets());
         sortSessionsNewestFirst();
+        recalcNextIds();
+    }
 
+    public void save() {
+        storage.saveSessions(sessions);
+        storage.saveDrills(drills);
+        storage.saveTargets(targets);
+    }
+
+    public void recalcNextIds() {
         int maxSession = 0;
         for (TrainingSession s : sessions) {
             if (s.id() > maxSession) maxSession = s.id();
@@ -38,17 +49,20 @@ public class TrackerService {
         nextDrillId = maxDrill + 1;
     }
 
-    public void save() {
-        storage.saveSessions(sessions);
-        storage.saveDrills(drills);
-    }
-
     public int nextSessionId() {
         return nextSessionId++;
     }
 
     public int nextDrillId() {
         return nextDrillId++;
+    }
+
+    public Targets getTargets() {
+        return targets;
+    }
+
+    public void setTargets(Targets targets) {
+        this.targets = targets;
     }
 
     public void addSession(TrainingSession session) {
@@ -78,6 +92,37 @@ public class TrackerService {
         return out;
     }
 
+    public boolean deleteSession(int sessionId) {
+        boolean removed = false;
+
+        for (int i = 0; i < sessions.size(); i++) {
+            if (sessions.get(i).id() == sessionId) {
+                sessions.remove(i);
+                removed = true;
+                break;
+            }
+        }
+        if (removed) {
+            for (int i = drills.size() - 1; i >= 0; i--) {
+                if (drills.get(i).sessionId() == sessionId) {
+                    drills.remove(i);
+                }
+            }
+        }
+        return removed;
+    }
+
+    public boolean updateSession(TrainingSession updated) {
+        for (int i = 0; i < sessions.size(); i++) {
+            if (sessions.get(i).id() == updated.id()) {
+                sessions.set(i, updated);
+                sortSessionsNewestFirst();
+                return true;
+            }
+        }
+        return false;
+    }
+
     public WeeklyStats getWeeklyStats(LocalDate from, LocalDate to) {
         List<TrainingSession> weekSessions = new ArrayList<>();
         for (TrainingSession s : sessions) {
@@ -97,15 +142,6 @@ public class TrackerService {
             minutesByType[s.type().ordinal()] += s.minutes();
         }
 
-        
-        
-        for  (TrainingSession s : weekSessions) {
-            totalMinutes += s.minutes();
-            load += s.minutes() * s.intensity();
-
-            int typeIndex = s.type().ordinal();
-            minutesByType[typeIndex] += s.minutes();
-        }
 
         Set<Integer> weekSessionIds = new HashSet<>();
         for (TrainingSession s : weekSessions) {

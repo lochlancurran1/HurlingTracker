@@ -3,14 +3,17 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class CsvStorage {
     private final Path sessionsPath;
     private final Path drillsPath;
+    private final Path targetsPath;
 
-    public CsvStorage(String sessionsFile, String drillsFile) {
+    public CsvStorage(String sessionsFile, String drillsFile, String targetsFile) {
         this.sessionsPath = Paths.get(sessionsFile);
         this.drillsPath = Paths.get(drillsFile);
+        this.targetsPath = Paths.get(targetsFile);
     }
 
     public List<TrainingSession> loadSessions() {
@@ -54,6 +57,25 @@ public class CsvStorage {
                 lines.add(d.toCsv());
             }
             writeAll(drillsPath, lines);
+        }
+
+        public Optional<Targets> loadTargets() {
+            if (!Files.exists(targetsPath)) return Optional.empty();
+            try {
+                List<String> lines = Files.readAllLines(targetsPath);
+                for (String line : lines) {
+                    if (!line.isBlank()) return Optional.of(Targets.fromCsv(line));
+                }
+                return Optional.empty();
+            } catch (IOException e) {
+                throw new RuntimeException("Failed reading targets: " + e.getMessage(), e);
+            }
+        }
+
+        public void saveTargets(Targets targets) {
+            List<String> lines = new ArrayList<>();
+            lines.add(targets.toCsv());
+            writeAll(targetsPath, lines);
         }
 
         private void writeAll(Path path, List<String> lines) {
