@@ -17,12 +17,16 @@ public class CsvStorage {
     }
 
     public List<TrainingSession> loadSessions() {
-        if (!Files.exists(sessionsPath)) return new ArrayList<>();
+        if (!Files.exists(sessionsPath)) {
+            return new ArrayList<>();
+        }
         try {
             List<String> lines = Files.readAllLines(sessionsPath);
             List<TrainingSession> out = new ArrayList<>();
             for (String line : lines) {
-                if (!line.isBlank()) out.add(TrainingSession.fromCsv(line));
+                if (!line.isBlank()) {
+                     out.add(TrainingSession.fromCsv(line));
+                }
             }
             return out;
         } catch (IOException e) {
@@ -38,12 +42,16 @@ public class CsvStorage {
         }
 
         public List<DrillEntry> loadDrills() {
-            if (!Files.exists(drillsPath)) return new ArrayList<>();
+            if (!Files.exists(drillsPath)) {
+                 return new ArrayList<>();
+            }
             try {
                 List<String> lines = Files.readAllLines(drillsPath);
                 List<DrillEntry> out = new ArrayList<>();
                 for (String line : lines) {
-                    if (!line.isBlank()) out.add(DrillEntry.fromCsv(line));
+                    if (!line.isBlank()) {
+                         out.add(DrillEntry.fromCsv(line));
+                    }
                 }
                 return out;
             } catch (IOException e) {
@@ -60,11 +68,15 @@ public class CsvStorage {
         }
 
         public Optional<Targets> loadTargets() {
-            if (!Files.exists(targetsPath)) return Optional.empty();
+            if (!Files.exists(targetsPath)) {
+                return Optional.empty();
+            }
             try {
                 List<String> lines = Files.readAllLines(targetsPath);
                 for (String line : lines) {
-                    if (!line.isBlank()) return Optional.of(Targets.fromCsv(line));
+                    if (!line.isBlank()) {
+                        return Optional.of(Targets.fromCsv(line));
+                    }
                 }
                 return Optional.empty();
             } catch (IOException e) {

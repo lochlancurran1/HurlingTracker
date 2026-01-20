@@ -1,25 +1,33 @@
-public record DrillEntry(
-    int id,
-    int sessionId,
-    DrillType drillType,
-    int reps,
-    int success,
-    String notes
-) {
+public record DrillEntry(int id, int sessionId, DrillType drillType,
+    int reps, int success, String notes) {
+
+     
     public static DrillEntry create(int id, int sessionId, DrillType drillType, int reps, int success, String notes) {
-        return new DrillEntry(
-            id,
-            sessionId,
-            drillType,
-            reps,
-            success,
-            notes == null ? "" : notes
-        );
+        String safeNotes;
+        if (notes == null) {
+            safeNotes = "";
+    }  else {
+        safeNotes = notes;
+    } 
+        return new DrillEntry(id, sessionId, drillType, reps, success, safeNotes);
     }
     public String neat() {
-        String n = notes.isBlank() ? "" : " | " + notes;
-        String suc = success > 0 ? (" | success " + success) : "";
-        return "- " + drillType + " reps " + reps + suc + n + " | ID " + id;
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Drill: ").append(drillType).append(" | Reps: ").append(reps);
+
+        if (success > 0) {
+            sb.append(" | Success: ").append(success);
+        }
+
+        if (!notes.isBlank()) {
+            sb.append(" | Notes: ").append(notes);
+        }
+
+        sb.append(" | ID: ").append(id);
+
+        return sb.toString();
+        
     }
 
     public String toCsv() {
